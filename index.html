@@ -1,0 +1,213 @@
+
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GD Light+</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: black;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background-color: #111;
+    }
+    #modMenu {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    #modMenu label {
+      display: block;
+      margin-bottom: 4px;
+    }
+    #logo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 80px;
+      height: 80px;
+      background: rgba(0,0,0,0.8);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="480" height="320"></canvas>
+  <div id="modMenu">
+    <label><input type="checkbox" id="noclip"> NoClip</label>
+    <label><input type="checkbox" id="autojump"> AutoJump</label>
+    <label><input type="range" id="speed" min="1" max="5" value="1"> SpeedHack</label>
+    <label><input type="checkbox" id="macro"> Auto Click Macro</label>
+    <label><input type="checkbox" id="infjump"> Jump Infini</label>
+  </div>
+  <div id="logo">
+    <img id="logoImg" src="mylogo.png" alt="GD Light+" style="max-width: 100%; max-height: 100%; display: none;">
+    <span id="logoText">GD Light+</span>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");const modMenu = {
+  noclip: false,
+  autojump: false,
+  speed: 1,
+  macro: false,
+  infinityJump: false,
+};
+
+document.getElementById("noclip").onchange = e => modMenu.noclip = e.target.checked;
+document.getElementById("autojump").onchange = e => modMenu.autojump = e.target.checked;
+document.getElementById("speed").oninput = e => modMenu.speed = parseFloat(e.target.value);
+document.getElementById("macro").onchange = e => modMenu.macro = e.target.checked;
+document.getElementById("infjump").onchange = e => modMenu.infinityJump = e.target.checked;
+
+const player = {
+  x: 50,
+  y: 200,
+  width: 20,
+  height: 20,
+  velocityY: 0,
+  gravity: 0.5,
+  jumpStrength: 10,
+  jumping: false,
+  rotation: 0,
+};
+
+// Load images
+const playerImg = new Image();
+playerImg.src = "cube.png";
+
+const backgroundImg = new Image();
+backgroundImg.src = "background.jpg";
+
+const groundImg = new Image();
+groundImg.src = "ground.png";
+
+const spikeImg = new Image();
+spikeImg.src = "spike.png";
+
+const obstacles = [];
+let frame = 0;
+
+function jump() {
+  if (!player.jumping || modMenu.infinityJump) {
+    player.velocityY = -player.jumpStrength;
+    player.jumping = true;
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space") jump();
+});
+
+document.addEventListener("touchstart", jump);
+document.addEventListener("mousedown", jump);
+
+function createObstacle() {
+  const height = 20 + Math.random() * 60;
+  obstacles.push({ x: canvas.width, y: canvas.height - height, width: 20, height });
+}
+
+function update() {
+  frame++;
+  if (frame % (60 / modMenu.speed) === 0) createObstacle();
+
+  player.velocityY += player.gravity;
+  player.y += player.velocityY;
+
+  // Update rotation when jumping
+  if (player.jumping) {
+    player.rotation += 0.2;
+  }
+
+  if (player.y + player.height >= canvas.height) {
+    player.y = canvas.height - player.height;
+    player.jumping = false;
+    player.rotation = 0; // Reset rotation when landing
+  }
+
+  if (modMenu.autojump && !player.jumping) jump();
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw background
+  if (backgroundImg.complete) {
+    ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+  }
+
+  // Draw player with rotation
+  ctx.save();
+  ctx.translate(player.x + player.width/2, player.y + player.height/2);
+  ctx.rotate(player.rotation);
+  
+  if (playerImg.complete) {
+    ctx.drawImage(playerImg, -player.width/2, -player.height/2, player.width, player.height);
+  } else {
+    ctx.fillStyle = "cyan";
+    ctx.fillRect(-player.width/2, -player.height/2, player.width, player.height);
+  }
+  
+  ctx.restore();
+
+  
+
+  // Draw and move obstacles
+  for (let i = 0; i < obstacles.length; i++) {
+    const obs = obstacles[i];
+    obs.x -= 2 * modMenu.speed;
+    
+    // Draw spike image or fallback to red rectangle
+    if (spikeImg.complete) {
+      ctx.drawImage(spikeImg, obs.x, obs.y, obs.width, obs.height);
+    } else {
+      ctx.fillStyle = "red";
+      ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    }
+
+    // Collision detection
+    if (!modMenu.noclip &&
+        player.x < obs.x + obs.width &&
+        player.x + player.width > obs.x &&
+        player.y < obs.y + obs.height &&
+        player.y + player.height > obs.y) {
+      alert("💥 Game Over!");
+      location.reload();
+    }
+  }
+}
+
+setInterval(update, 1000 / 60);
+
+// Logo handling
+const logoImg = document.getElementById("logoImg");
+const logoText = document.getElementById("logoText");
+
+logoImg.onload = function() {
+  logoText.style.display = "none";
+  logoImg.style.display = "block";
+};
+
+logoImg.onerror = function() {
+  logoText.style.display = "block";
+  logoImg.style.display = "none";
+};
+
+  </script>
+</body>
+</html>
